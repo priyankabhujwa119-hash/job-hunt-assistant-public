@@ -22,7 +22,7 @@ st.caption("AI-powered job search — free forever")
 st.markdown("---")
 
 
-tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
+tab1, tab2, tab3 = st.tabs(["🔐 Login", "📝 Register", "🔑 Forgot Password"])
 
 
 with tab1:
@@ -111,3 +111,85 @@ with tab2:
                     st.error(msg)
         else:
             st.warning("Please fill all fields")
+
+
+with tab3:
+    st.subheader("Reset your password")
+    st.caption("We'll send a 6-digit code to your email")
+
+    if "reset_stage" not in st.session_state:
+        st.session_state.reset_stage = "email"
+
+    if st.session_state.reset_stage == "email":
+        reset_email = st.text_input(
+            "Your email", placeholder="you@gmail.com", key="reset_email"
+        )
+        reset_gmail = st.text_input(
+            "Your Gmail (to receive code)",
+            placeholder="sender@gmail.com",
+            key="reset_gmail",
+        )
+        reset_gmail_pass = st.text_input(
+            "Gmail App Password", type="password", key="reset_gmail_pass"
+        )
+        if st.button("📨 Send Reset Code", key="send_reset"):
+            if reset_email and reset_gmail and reset_gmail_pass:
+                from engines.auth import (
+                    generate_reset_code,
+                    save_reset_code,
+                    send_reset_email,
+                    login_user,
+                )
+
+                ok, _, _ = login_user(reset_email, "dummy_check_exists")
+                exists = ok or True
+                code = generate_reset_code()
+                save_reset_code(reset_email, code)
+                sent = send_reset_email(
+                    reset_email, code, reset_gmail, reset_gmail_pass
+                )
+                if sent:
+                    st.session_state.reset_email_val = reset_email
+                    st.session_state.reset_stage = "code"
+                    st.success("✅ Code sent! Check your email.")
+                    st.rerun()
+                else:
+                    st.error("Failed to send email. Check your Gmail credentials.")
+            else:
+                st.warning("Fill all fields")
+
+    elif st.session_state.reset_stage == "code":
+        st.info(f"Code sent to {st.session_state.get('reset_email_val','')}")
+        code_input = st.text_input(
+            "Enter 6-digit code", placeholder="123456", key="code_input"
+        )
+        new_pass = st.text_input("New password", type="password", key="new_pass")
+        new_pass2 = st.text_input(
+            "Confirm new password", type="password", key="new_pass2"
+        )
+        if st.button("🔐 Reset Password", key="do_reset"):
+            if new_pass != new_pass2:
+                st.error("Passwords don't match")
+            elif len(new_pass) < 6:
+                st.error("Password must be at least 6 characters")
+            else:
+                from engines.auth import verify_reset_code, reset_password
+
+                ok, msg = verify_reset_code(
+                    st.session_state.reset_email_val, code_input
+                )
+                if ok:
+                    ok2, msg2 = reset_password(
+                        st.session_state.reset_email_val, new_pass
+                    )
+                    if ok2:
+                        st.success("✅ Password reset! Please login.")
+                        st.session_state.reset_stage = "email"
+                        st.rerun()
+                    else:
+                        st.error(msg2)
+                else:
+                    st.error(msg)
+        if st.button("← Back", key="reset_back"):
+            st.session_state.reset_stage = "email"
+            st.rerun()

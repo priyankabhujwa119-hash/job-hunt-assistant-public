@@ -2,6 +2,8 @@ import hashlib
 import json
 from datetime import datetime
 import base64
+import random
+import string
 
 SUPABASE_URL = "https://ggdnrhrwgyezzccrcwyq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG5yaHJ3Z3llenpjY3Jjd3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMDUxMDQsImV4cCI6MjA4OTU4MTEwNH0.4W6scrIGIJl56y4NN7MI2iHBx5Q-ZmlViottew91iLc"
@@ -120,6 +122,92 @@ def load_session_data(email):
     applications = load_user_data(email, "applications") or []
     cv_bytes = load_cv(email)
     return keys, jobs, applications, cv_bytes
+
+
+def generate_reset_code():
+    return "".join(random.choices(string.digits, k=6))
+
+
+def save_reset_code(email, code):
+    try:
+        client = get_client()
+        client.table("users").update(
+            {
+                "reset_code": code,
+                "reset_at": datetime.now().isoformat(),
+            }
+        ).eq("email", email).execute()
+        return True
+    except Exception as e:
+        print(f"Reset code save error: {e}")
+        return False
+
+
+def verify_reset_code(email, code):
+    try:
+        client = get_client()
+        result = (
+            client.table("users")
+            .select("reset_code, reset_at")
+            .eq("email", email)
+            .execute()
+        )
+        if not result.data:
+            return False, "Email not found"
+        user = result.data[0]
+        if user.get("reset_code") != code:
+            return False, "Invalid code"
+        from datetime import timedelta
+
+        reset_at = datetime.fromisoformat(user.get("reset_at", ""))
+        if datetime.now() - reset_at > timedelta(minutes=15):
+            return False, "Code expired — request a new one"
+        return True, "Code verified"
+    except Exception as e:
+        return False, str(e)
+
+
+def reset_password(email, new_password):
+    try:
+        client = get_client()
+        client.table("users").update(
+            {
+                "password_hash": hash_password(new_password),
+                "reset_code": None,
+            }
+        ).eq("email", email).execute()
+        return True, "Password updated"
+    except Exception as e:
+        return False, str(e)
+
+
+def send_reset_email(email, code, gmail, gmail_pass):
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = gmail
+        msg["To"] = email
+        msg["Subject"] = "Job Hunt Assistant — Password Reset Code"
+        body = f"""Hi, 
+
+ Your password reset code is: {code} 
+
+ This code expires in 15 minutes. 
+
+ If you didn't request this, ignore this email. 
+
+ Job Hunt Assistant Team"""
+        msg.attach(MIMEText(body, "plain"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail, gmail_pass)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Reset email error: {e}")
+        return False
 
 
 if __name__ == "__main__":

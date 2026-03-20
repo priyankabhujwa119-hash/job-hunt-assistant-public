@@ -158,7 +158,15 @@ with tab2:
         st.session_state.gmail_address = gmail
         st.session_state.gmail_password = gmail_pass
         st.session_state.gemini_key = gemini
-        st.success("✅ API keys updated!")
+        try:
+            from engines.auth import save_api_keys
+
+            email = st.session_state.get("user_email", "")
+            if email:
+                save_api_keys(email, groq, serpapi, gmail, gmail_pass, gemini)
+            st.success("✅ API keys saved permanently!")
+        except Exception:
+            st.success("✅ API keys updated for this session")
 
 
 with tab3:
