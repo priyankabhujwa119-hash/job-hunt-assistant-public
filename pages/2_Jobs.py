@@ -158,6 +158,19 @@ for job in filtered:
                         ),
                     }
                 )
+                try:
+                    from engines.auth import save_user_data
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(email, "jobs", st.session_state.jobs)
+                        save_user_data(
+                            email,
+                            "applications",
+                            st.session_state.get("applications", []),
+                        )
+                except Exception:
+                    pass
                 st.rerun()
 
         if st.session_state.get(f"cv_ready_{job['id']}"):

@@ -180,6 +180,14 @@ with col1:
                 count = len(results)
                 st.success(f"✅ Found {count} jobs!")
                 try:
+                    from engines.auth import save_user_data
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(email, "jobs", st.session_state.jobs)
+                except Exception:
+                    pass
+                try:
                     from engines.tracker import track_event
 
                     profile = st.session_state.get("user_profile", {})
