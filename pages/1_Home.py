@@ -163,7 +163,19 @@ with col1:
                     serpapi_key,
                 )
                 st.session_state.jobs = results
-                st.success(f"✅ Found {len(results)} jobs!")
+                count = len(results)
+                st.success(f"✅ Found {count} jobs!")
+                try:
+                    from engines.tracker import track_event
+
+                    profile = st.session_state.get("user_profile", {})
+                    track_event(
+                        profile.get("email", "anonymous"),
+                        "job_search",
+                        {"role": role, "location": location, "results": count},
+                    )
+                except Exception:
+                    pass
                 st.rerun()
 
 
@@ -173,4 +185,3 @@ with col2:
             st.info("Scoring skipped in test mode")
         else:
             st.info("Scoring not implemented yet")
-

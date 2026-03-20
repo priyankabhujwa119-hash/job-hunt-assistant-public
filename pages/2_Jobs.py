@@ -113,6 +113,17 @@ for job in filtered:
                         st.session_state[f"cv_summary_{job['id']}"] = r.choices[0].message.content
                         st.session_state[f"cv_ready_{job['id']}"] = True
                         st.success("✅ CV tailored!")
+                    try:
+                        from engines.tracker import track_event
+
+                        profile = st.session_state.get("user_profile", {})
+                        track_event(
+                            profile.get("email", "anonymous"),
+                            "cv_generated",
+                            {"company": job["company"], "role": job["title"]},
+                        )
+                    except Exception:
+                        pass
         with cd:
             if st.button("📋 Mark Applied", key=f"done_{job['id']}"):
                 job["status"] = "applied"
@@ -148,4 +159,3 @@ for job in filtered:
             to_email = st.text_input("Recipient email:", key=f"email_{job['id']}")
             if st.button("📧 Send Application", key=f"send_{job['id']}"):
                 st.info("Email sending coming soon!")
-

@@ -150,17 +150,6 @@ elif st.session_state.setup_step == 2:
 elif st.session_state.setup_step == 3:
     st.subheader("🔑 Step 3: API Keys")
     st.caption("All free. Never stored — stays in your browser session only.")
-    st.markdown("---")
-    if st.button("🧪 Skip — Use Test Mode"):
-        st.session_state.groq_key = "test_mode"
-        st.session_state.serpapi_key = "test_mode"
-        st.session_state.gmail_address = ""
-        st.session_state.gmail_password = ""
-        st.session_state.gemini_key = ""
-        st.session_state.setup_complete = True
-        st.session_state.setup_step = 4
-        st.rerun()
-    st.markdown("---")
     st.markdown("**🤖 Groq API Key** (Required)")
     st.markdown(" `https://console.groq.com` ")
     groq_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
@@ -191,6 +180,12 @@ elif st.session_state.setup_step == 3:
                 st.session_state.gemini_key = gemini_key
                 st.session_state.setup_complete = True
                 st.session_state.setup_step = 4
+                try:
+                    from engines.tracker import track_signup
+
+                    track_signup(st.session_state.user_profile)
+                except Exception:
+                    pass
                 st.rerun()
             else:
                 st.warning("Groq and SerpAPI keys are required")
