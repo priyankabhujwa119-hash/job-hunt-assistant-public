@@ -195,6 +195,40 @@ elif st.session_state.setup_step == 3:
         "page and paste it here."
     )
     gemini_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
+    with st.expander("Need more help? Click for detailed instructions"):
+        st.markdown("**Groq API Key – detailed steps**")
+        st.markdown(
+            """1. Go to https://console.groq.com  
+2. Sign up or log in  
+3. Open the API Keys section in the left menu  
+4. Click “Create API Key” and copy the key starting with `gsk_`  
+5. Paste it into the Groq field above"""
+        )
+        st.markdown("**SerpAPI Key – detailed steps**")
+        st.markdown(
+            """1. Go to https://serpapi.com and create a free account  
+2. After login, go to your dashboard  
+3. Find the “API Key” box at the top of the page  
+4. Click to copy the key  
+5. Paste it into the SerpAPI field above"""
+        )
+        st.markdown("**Gmail App Password – detailed steps**")
+        st.markdown(
+            """1. Go to https://myaccount.google.com and open “Security”  
+2. Turn on 2‑Step Verification if it is not enabled  
+3. In the Security page, search for “App passwords”  
+4. Choose “Mail” as the app and your device (or “Other”)  
+5. Generate the 16‑character password and copy it  
+6. Paste that password (without spaces) into the Gmail App Password field"""
+        )
+        st.markdown("**Gemini API Key – detailed steps**")
+        st.markdown(
+            """1. Go to https://aistudio.google.com  
+2. Sign in with your Google account  
+3. Open the “API Keys” section in the left menu  
+4. Click “Create API key” and confirm  
+5. Copy the key starting with `AIza` and paste it into the Gemini field"""
+        )
     cb, cn = st.columns(2)
     with cb:
         if st.button("← Back"):
