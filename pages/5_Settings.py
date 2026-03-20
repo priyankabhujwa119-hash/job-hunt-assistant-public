@@ -44,7 +44,9 @@ st.markdown("---")
 profile = st.session_state.get("user_profile", {})
 
 
-tab1, tab2, tab3 = st.tabs(["👤 Profile", "🔑 API Keys", "🔄 Reset"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["👤 Profile", "🔑 API Keys", "🔄 Reset", "🔔 Job Alerts"]
+)
 
 
 with tab1:
@@ -183,3 +185,90 @@ with tab3:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.switch_page("pages/0_Setup.py")
+
+
+with tab4:
+    st.subheader("🔔 Job Alerts")
+    st.caption("Get email notifications when new matching jobs are found")
+
+    from engines.alerts import save_alert, get_user_alerts, delete_alert
+
+    email = st.session_state.get("user_email", "")
+    profile = st.session_state.get("user_profile", {})
+
+    st.markdown("**Set up a new alert:**")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        alert_role = st.text_input(
+            "Job Title",
+            value=profile.get("target_roles", [""])[0]
+            if profile.get("target_roles")
+            else "",
+            key="alert_role",
+        )
+    with c2:
+        alert_location = st.text_input(
+            "Location",
+            value=profile.get("target_markets", ["Europe"])[0]
+            if profile.get("target_markets")
+            else "Europe",
+            key="alert_location",
+        )
+    with c3:
+        alert_freq = st.selectbox("Frequency", ["daily", "weekly"], key="alert_freq")
+
+    if st.button("➕ Add Alert", key="add_alert"):
+        if alert_role and alert_location:
+            gmail_check = st.session_state.get("gmail_address", "")
+            if not gmail_check:
+                st.warning("Please add Gmail in API Keys tab first")
+            else:
+                ok = save_alert(email, alert_role, alert_location, alert_freq)
+                if ok:
+                    st.success(f"✅ Alert set for '{alert_role}' in {alert_location}!")
+                    st.rerun()
+        else:
+            st.warning("Fill in role and location")
+
+    st.markdown("---")
+    st.markdown("**Your active alerts:**")
+    alerts = get_user_alerts(email)
+    if not alerts:
+        st.info("No alerts set up yet.")
+    for alert in alerts:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(
+                f"🔔 **{alert['role']}** in {alert['location']} — {alert['frequency']}"
+            )
+        with c2:
+            if st.button("🗑️ Delete", key=f"del_alert_{alert['id']}"):
+                delete_alert(alert["id"])
+                st.rerun()
+
+    st.markdown("---")
+    st.markdown("**Test your alert:**")
+    if st.button("📧 Send Test Alert Now"):
+        gmail = st.session_state.get("gmail_address", "")
+        gmail_pass = st.session_state.get("gmail_password", "")
+        if not gmail or not gmail_pass:
+            st.warning("Add Gmail credentials first")
+        else:
+            from engines.alerts import send_job_alert_email
+
+            test_jobs = st.session_state.get("jobs", [])[:3]
+            if test_jobs:
+                ok = send_job_alert_email(
+                    email,
+                    test_jobs,
+                    alert_role or "Talent Acquisition",
+                    alert_location or "Europe",
+                    gmail,
+                    gmail_pass,
+                )
+                if ok:
+                    st.success("✅ Test alert sent! Check your email.")
+                else:
+                    st.error("Failed to send. Check Gmail credentials.")
+            else:
+                st.warning("Search for jobs first to test alerts")
