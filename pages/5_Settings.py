@@ -68,9 +68,25 @@ with tab1:
             "Notice Period",
             ["Immediate", "2 weeks", "1 month", "2 months", "3 months"],
         )
-        min_salary = st.text_input(
-            "Min Salary EUR", value=str(profile.get("min_salary_eur", ""))
-        )
+        sc1, sc2 = st.columns([2, 1])
+        with sc1:
+            min_salary = st.text_input(
+                "Min Salary",
+                value=str(
+                    profile.get("min_salary", profile.get("min_salary_eur", ""))
+                ),
+            )
+        with sc2:
+            salary_currency = st.selectbox(
+                "Currency",
+                ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"],
+                index=["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"].index(
+                    profile.get("salary_currency", "EUR")
+                )
+                if profile.get("salary_currency", "EUR")
+                in ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"]
+                else 0,
+            )
     target_roles = st.multiselect(
         "Target Roles",
         [
@@ -99,6 +115,8 @@ with tab1:
                 "years_experience": experience,
                 "relocate": relocate == "Yes",
                 "notice_period": notice,
+                "min_salary": min_salary,
+                "salary_currency": salary_currency,
                 "min_salary_eur": min_salary,
                 "target_roles": target_roles,
                 "target_markets": target_markets,

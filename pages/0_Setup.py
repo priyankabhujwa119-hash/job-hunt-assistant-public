@@ -83,7 +83,14 @@ elif st.session_state.setup_step == 2:
             "Notice Period",
             ["Immediate", "2 weeks", "1 month", "2 months", "3 months"],
         )
-        min_salary = st.text_input("Min Salary EUR", placeholder="60000")
+        sc1, sc2 = st.columns([2, 1])
+        with sc1:
+            min_salary = st.text_input("Min Salary", placeholder="60000")
+        with sc2:
+            salary_currency = st.selectbox(
+                "Currency",
+                ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"],
+            )
     target_roles = st.multiselect(
         "Target Roles *",
         [
@@ -131,6 +138,8 @@ elif st.session_state.setup_step == 2:
                     "location": location,
                     "relocate": relocate == "Yes",
                     "notice_period": notice,
+                    "min_salary": min_salary,
+                    "salary_currency": salary_currency,
                     "min_salary_eur": min_salary,
                     "years_experience": experience,
                     "target_roles": target_roles,
@@ -156,18 +165,35 @@ elif st.session_state.setup_step == 3:
     st.caption("All free. Never stored — stays in your browser session only.")
     st.markdown("**🤖 Groq API Key** (Required)")
     st.markdown(" `https://console.groq.com` ")
+    st.caption(
+        "Create a free Groq account, go to API Keys in the console, generate a key "
+        "starting with `gsk_` and paste it here."
+    )
     groq_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
     st.markdown("**🔍 SerpAPI Key** (Required)")
     st.markdown(" `https://serpapi.com` ")
+    st.caption(
+        "Sign up on SerpAPI, open your dashboard, copy the API key from the top "
+        "of the page and paste it here."
+    )
     serpapi_key = st.text_input("SerpAPI Key", type="password", placeholder="...")
     st.markdown("**📧 Gmail** (Optional — for email applications)")
     st.markdown(" `https://support.google.com/accounts/answer/185833` ")
+    st.caption(
+        "Use a Gmail App Password, not your normal password. Turn on 2‑Step "
+        "Verification in your Google Account, create an App Password for Mail, "
+        "then paste the 16‑character password here."
+    )
     gmail = st.text_input("Gmail Address", placeholder="you@gmail.com")
     gmail_pass = st.text_input(
         "Gmail App Password", type="password", placeholder="xxxx xxxx xxxx xxxx"
     )
     st.markdown("**✨ Gemini API Key** (Optional — better CV tailoring)")
     st.markdown(" `https://aistudio.google.com` ")
+    st.caption(
+        "Create a key in Google AI Studio, copy the `AIza...` key from the API Keys "
+        "page and paste it here."
+    )
     gemini_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
     cb, cn = st.columns(2)
     with cb:
