@@ -100,44 +100,46 @@ for job in filtered:
                 st.rerun()
         with cc:
             if st.button("📄 Generate CV", key=f"cv_{job['id']}"):
-                with st.spinner("Generating tailored CV..."):
-                    groq_key = st.session_state.get("groq_key")
+                with st.spinner("Tailoring your CV..."):
+                    from engines.cv_public import (
+                        extract_cv_summary,
+                        tailor_cv_summary,
+                        generate_cover_letter,
+                        create_tailored_cv_bytes,
+                    )
+
+                    groq_key = st.session_state.get("groq_key", "")
                     profile = st.session_state.get("user_profile", {})
-                    cv_text = st.session_state.get("cv_text", "")
-                    if groq_key == "test_mode":
-                        st.session_state[f"cv_ready_{job['id']}"] = True
-                        st.session_state[f"cv_summary_{job['id']}"] = (
-                            f"Tailored summary for {job['title']} at {job['company']} — test mode"
-                        )
-                        st.success("✅ CV generated! (Test mode)")
+                    cv_bytes = st.session_state.get("cv_bytes", None)
+                    if not cv_bytes:
+                        st.warning("Please upload your CV in setup first")
                     else:
-                        from groq import Groq
-
-                        client = Groq(api_key=groq_key)
-                        prompt = (
-                            f"Tailor this CV summary for: {job['title']} at {job['company']}.\n"
-                            f"JD: {job['description'][:500]}\n"
-                            f"CV: {cv_text[:500]}\n"
-                            f"Return only 4-5 sentences."
+                        cv_summary = extract_cv_summary(cv_bytes)
+                        tailored = tailor_cv_summary(cv_summary, job, profile, groq_key)
+                        cover_letter = generate_cover_letter(job, profile, groq_key)
+                        tailored_cv_bytes = create_tailored_cv_bytes(
+                            cv_bytes, tailored, job
                         )
-                        r = client.chat.completions.create(
-                            model="llama-3.3-70b-versatile",
-                            messages=[{"role": "user", "content": prompt}],
-                        )
-                        st.session_state[f"cv_summary_{job['id']}"] = r.choices[0].message.content
                         st.session_state[f"cv_ready_{job['id']}"] = True
-                        st.success("✅ CV tailored!")
-                    try:
-                        from engines.tracker import track_event
+                        st.session_state[f"cv_summary_{job['id']}"] = tailored
+                        st.session_state[f"cv_bytes_{job['id']}"] = tailored_cv_bytes
+                        st.session_state[f"cl_{job['id']}"] = cover_letter
+                        try:
+                            from engines.tracker import track_event
+                            from engines.auth import save_user_data
 
-                        profile = st.session_state.get("user_profile", {})
-                        track_event(
-                            profile.get("email", "anonymous"),
-                            "cv_generated",
-                            {"company": job["company"], "role": job["title"]},
-                        )
-                    except Exception:
-                        pass
+                            email = st.session_state.get("user_email", "")
+                            track_event(
+                                email,
+                                "cv_generated",
+                                {
+                                    "company": job["company"],
+                                    "role": job["title"],
+                                },
+                            )
+                        except Exception:
+                            pass
+                        st.success("✅ CV tailored!")
         with cd:
             if st.button("📋 Mark Applied", key=f"done_{job['id']}"):
                 job["status"] = "applied"
@@ -176,13 +178,121 @@ for job in filtered:
         if st.session_state.get(f"cv_ready_{job['id']}"):
             st.info("📄 **Tailored Summary:**")
             st.write(st.session_state.get(f"cv_summary_{job['id']}", ""))
+            cv_b = st.session_state.get(f"cv_bytes_{job['id']}")
+            if cv_b:
+                st.download_button(
+                    "⬇️ Download Tailored CV",
+                    data=cv_b,
+                    file_name=f"CV_{job['company']}_{job['title'][:20]}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"dl_{job['id']}",
+                )
+            cl = st.session_state.get(f"cl_{job['id']}", "")
+            if cl:
+                with st.expander("📝 View Cover Letter"):
+                    st.text_area(
+                        "Cover Letter",
+                        cl,
+                        height=300,
+                        key=f"clview_{job['id']}",
+                    )
+                st.download_button(
+                    "⬇️ Download Cover Letter",
+                    data=cl.encode(),
+                    file_name=f"CoverLetter_{job['company']}.txt",
+                    mime="text/plain",
+                    key=f"cldl_{job['id']}",
+                )
 
         st.markdown("---")
         st.markdown("**📧 Email Application**")
         gmail = st.session_state.get("gmail_address", "")
         if not gmail:
-            st.caption("Add Gmail in setup to enable email applications")
+            st.caption("Add Gmail in Settings to enable email applications")
         else:
-            to_email = st.text_input("Recipient email:", key=f"email_{job['id']}")
-            if st.button("📧 Send Application", key=f"send_{job['id']}"):
-                st.info("Email sending coming soon!")
+            from engines.email_public import extract_email_from_jd, find_company_email_groq
+
+            found_email = extract_email_from_jd(job.get("description", ""))
+            if not found_email:
+                if st.button("🔍 Find Company Email", key=f"femail_{job['id']}"):
+                    with st.spinner("Searching..."):
+                        found_email = find_company_email_groq(
+                            job["company"], st.session_state.get("groq_key", "")
+                        )
+                        if found_email:
+                            st.session_state[f"to_email_{job['id']}"] = found_email
+                        else:
+                            st.session_state[f"to_email_{job['id']}"] = ""
+                            st.warning("No email found — enter manually")
+            to_email = st.text_input(
+                "Recipient email:",
+                value=st.session_state.get(f"to_email_{job['id']}", found_email or ""),
+                key=f"emailinput_{job['id']}",
+            )
+            if to_email and st.button("📧 Send Application", key=f"send_{job['id']}"):
+                if not st.session_state.get(f"cv_ready_{job['id']}"):
+                    st.warning("Generate CV first before sending!")
+                else:
+                    with st.spinner("Sending application..."):
+                        from engines.email_public import (
+                            send_application_email,
+                            build_subject,
+                            build_body,
+                        )
+
+                        profile = st.session_state.get("user_profile", {})
+                        cv_bytes = st.session_state.get(f"cv_bytes_{job['id']}")
+                        cl_text = st.session_state.get(f"cl_{job['id']}", "")
+                        gmail_pass = st.session_state.get("gmail_password", "")
+                        subject = build_subject(job, profile)
+                        body = build_body(job, profile, cl_text)
+                        success, message = send_application_email(
+                            to_email,
+                            subject,
+                            body,
+                            cv_bytes,
+                            cl_text,
+                            gmail,
+                            gmail_pass,
+                            profile,
+                        )
+                        if success:
+                            job["status"] = "applied"
+                            if "applications" not in st.session_state:
+                                st.session_state.applications = []
+                            st.session_state.applications.append(
+                                {
+                                    "id": len(st.session_state.applications) + 1,
+                                    "company": job["company"],
+                                    "role": job["title"],
+                                    "location": job["location"],
+                                    "track": job.get("track"),
+                                    "status": "applied",
+                                    "date_applied": date.today().isoformat(),
+                                    "score": job.get("score", 0),
+                                    "cv_summary": st.session_state.get(
+                                        f"cv_summary_{job['id']}", ""
+                                    ),
+                                }
+                            )
+                            try:
+                                from engines.tracker import track_event
+                                from engines.auth import save_user_data
+
+                                email_addr = st.session_state.get("user_email", "")
+                                track_event(
+                                    email_addr,
+                                    "email_applied",
+                                    {"company": job["company"]},
+                                )
+                                save_user_data(
+                                    email_addr,
+                                    "applications",
+                                    st.session_state.applications,
+                                )
+                            except Exception:
+                                pass
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(message)

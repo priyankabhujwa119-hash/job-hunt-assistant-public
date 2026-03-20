@@ -95,110 +95,44 @@ with st.expander("⚙️ Search Settings", expanded=True):
             default=["Director", "Head", "VP", "Senior Manager", "Associate Director"],
         )
 
+    st.session_state.search_role = role
+    st.session_state.search_location = location
+    st.session_state.search_track = track
+
 
 col1, col2 = st.columns(2)
 with col1:
     if st.button("▶ Search Jobs", use_container_width=True):
-        if st.session_state.get("serpapi_key") == "test_mode":
-            st.session_state.jobs = [
-                {
-                    "id": 1,
-                    "title": "Head of Talent Acquisition",
-                    "company": "Cielo Talent",
-                    "location": "Barcelona, Spain",
-                    "track": "B",
-                    "score": 92,
-                    "status": "new",
-                    "url": " `https://linkedin.com` ",
-                    "description": "Lead RPO delivery for pharma clients across Europe",
-                    "source": "Google Jobs",
-                },
-                {
-                    "id": 2,
-                    "title": "RPO Delivery Manager",
-                    "company": "Randstad",
-                    "location": "Mumbai, India",
-                    "track": "A",
-                    "score": 85,
-                    "status": "new",
-                    "url": " `https://linkedin.com` ",
-                    "description": "Manage European client recruitment from India delivery centre",
-                    "source": "Google Jobs",
-                },
-                {
-                    "id": 3,
-                    "title": "Senior TA Manager EMEA",
-                    "company": "Allegis Group",
-                    "location": "Amsterdam, Netherlands",
-                    "track": "B",
-                    "score": 78,
-                    "status": "new",
-                    "url": " `https://linkedin.com` ",
-                    "description": "Lead EMEA talent acquisition strategy",
-                    "source": "Google Jobs",
-                },
-                {
-                    "id": 4,
-                    "title": "Associate Director Recruitment",
-                    "company": "Korn Ferry",
-                    "location": "Bengaluru, India",
-                    "track": "A",
-                    "score": 75,
-                    "status": "new",
-                    "url": " `https://linkedin.com` ",
-                    "description": "Drive European hiring programmes from India hub",
-                    "source": "Google Jobs",
-                },
-                {
-                    "id": 5,
-                    "title": "Global Talent Director",
-                    "company": "BCG",
-                    "location": "Madrid, Spain",
-                    "track": "B",
-                    "score": 88,
-                    "status": "new",
-                    "url": " `https://linkedin.com` ",
-                    "description": "Lead global talent acquisition for BCG Europe",
-                    "source": "Google Jobs",
-                },
-            ]
-            st.success(f"✅ Found {len(st.session_state.jobs)} jobs! (Test mode)")
-            st.rerun()
-        else:
-            with st.spinner("Searching jobs..."):
-                from scrapers.scraper_google_jobs import scrape_custom_google_jobs
+        with st.spinner("Searching jobs across the internet..."):
+            from scrapers.scraper_public import search_jobs_serpapi, score_jobs_with_groq
 
-                serpapi_key = st.session_state.get("serpapi_key")
-                results = scrape_custom_google_jobs(
-                    role or "talent acquisition manager",
-                    location or "Europe",
-                    "B",
-                    [],
-                    serpapi_key,
-                )
-                st.session_state.jobs = results
-                count = len(results)
-                st.success(f"✅ Found {count} jobs!")
+            serpapi_key = st.session_state.get("serpapi_key", "")
+            groq_key = st.session_state.get("groq_key", "")
+            profile = st.session_state.get("user_profile", {})
+            track_val = "A" if "A" in track else ("B" if "B" in track else "B")
+            jobs = search_jobs_serpapi(
+                role or "talent acquisition manager",
+                location or "Europe",
+                track_val,
+                serpapi_key,
+            )
+            if jobs:
+                with st.spinner(f"Scoring {len(jobs)} jobs with AI..."):
+                    jobs = score_jobs_with_groq(jobs, profile, groq_key)
+                st.session_state.jobs = jobs
                 try:
+                    from engines.tracker import track_event
                     from engines.auth import save_user_data
 
                     email = st.session_state.get("user_email", "")
-                    if email:
-                        save_user_data(email, "jobs", st.session_state.jobs)
+                    track_event(email, "job_search", {"role": role, "count": len(jobs)})
+                    save_user_data(email, "jobs", jobs)
                 except Exception:
                     pass
-                try:
-                    from engines.tracker import track_event
-
-                    profile = st.session_state.get("user_profile", {})
-                    track_event(
-                        profile.get("email", "anonymous"),
-                        "job_search",
-                        {"role": role, "location": location, "results": count},
-                    )
-                except Exception:
-                    pass
+                st.success(f"✅ Found {len(jobs)} jobs, scored by AI!")
                 st.rerun()
+            else:
+                st.warning("No jobs found. Try different search terms.")
 
 
 with col2:
